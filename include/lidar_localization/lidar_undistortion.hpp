@@ -8,6 +8,7 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <iostream>
+#include "lidar_localization/point_type.hpp"
 
 class LidarUndistortion
 {
@@ -74,7 +75,7 @@ public:
   // Ref:LeGO-LOAM(BSD-3 LICENSE)
   // https://github.com/RobustFieldAutonomyLab/LeGO-LOAM/blob/master/LeGO-LOAM/src/featureAssociation.cpp#L491-L619
   void adjustDistortion(
-    pcl::PointCloud<pcl::PointXYZI>::Ptr & cloud,
+    PclCloudType::Ptr & cloud,
     const double scan_time /*[sec]*/)
   {
     bool half_passed = false;
@@ -95,7 +96,7 @@ public:
     Eigen::Vector3f adjusted_p;
     float ori_h;
     for (int i = 0; i < cloud_size; ++i) {
-      pcl::PointXYZI & p = cloud->points[i];
+      PclPointType & p = cloud->points[i];
       ori_h = -std::atan2(p.y, p.x);
       if (!half_passed) {
         if (ori_h < start_ori - M_PI * 0.5) {

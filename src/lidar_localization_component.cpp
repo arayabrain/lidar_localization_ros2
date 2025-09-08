@@ -84,7 +84,7 @@ CallbackReturn PCLLocalization::on_activate(const rclcpp_lifecycle::State &)
   }
 
   if (use_pcd_map_) {
-    pcl::PointCloud<pcl::PointXYZI>::Ptr map_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>);
+    PclCloudType::Ptr map_cloud_ptr(new PclCloudType);
     // load a pcd or ply file
     if (map_path_.rfind(".pcd") != std::string::npos) {
       RCLCPP_INFO(get_logger(), "Loading pcd map from: %s", map_path_.c_str());
@@ -113,7 +113,7 @@ CallbackReturn PCLLocalization::on_activate(const rclcpp_lifecycle::State &)
     RCLCPP_INFO(get_logger(), "Initial Map Published");
 
     if (registration_method_ == "GICP" || registration_method_ == "GICP_OMP") {
-      pcl::PointCloud<pcl::PointXYZI>::Ptr filtered_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>());
+      PclCloudType::Ptr filtered_cloud_ptr(new PclCloudType());
       voxel_grid_filter_.setInputCloud(map_cloud_ptr);
       voxel_grid_filter_.filter(*filtered_cloud_ptr);
       registration_->setInputTarget(filtered_cloud_ptr);
@@ -266,22 +266,22 @@ void PCLLocalization::initializeRegistration()
   RCLCPP_INFO(get_logger(), "initializeRegistration");
 
   if (registration_method_ == "GICP") {
-    boost::shared_ptr<pcl::GeneralizedIterativeClosestPoint<pcl::PointXYZI, pcl::PointXYZI>> gicp(
-      new pcl::GeneralizedIterativeClosestPoint<pcl::PointXYZI, pcl::PointXYZI>());
+    boost::shared_ptr<pcl::GeneralizedIterativeClosestPoint<PclPointType, PclPointType>> gicp(
+      new pcl::GeneralizedIterativeClosestPoint<PclPointType, PclPointType>());
     gicp->setTransformationEpsilon(transform_epsilon_);
     registration_ = gicp;
   }
   else if (registration_method_ == "NDT") {
-    boost::shared_ptr<pcl::NormalDistributionsTransform<pcl::PointXYZI, pcl::PointXYZI>> ndt(
-      new pcl::NormalDistributionsTransform<pcl::PointXYZI, pcl::PointXYZI>());
+    boost::shared_ptr<pcl::NormalDistributionsTransform<PclPointType, PclPointType>> ndt(
+      new pcl::NormalDistributionsTransform<PclPointType, PclPointType>());
     ndt->setStepSize(ndt_step_size_);
     ndt->setResolution(ndt_resolution_);
     ndt->setTransformationEpsilon(transform_epsilon_);
     registration_ = ndt;
   }
   else if (registration_method_ == "NDT_OMP") {
-    pclomp::NormalDistributionsTransform<pcl::PointXYZI, pcl::PointXYZI>::Ptr ndt_omp(
-      new pclomp::NormalDistributionsTransform<pcl::PointXYZI, pcl::PointXYZI>());
+    pclomp::NormalDistributionsTransform<PclPointType, PclPointType>::Ptr ndt_omp(
+      new pclomp::NormalDistributionsTransform<PclPointType, PclPointType>());
     ndt_omp->setStepSize(ndt_step_size_);
     ndt_omp->setResolution(ndt_resolution_);
     ndt_omp->setTransformationEpsilon(transform_epsilon_);
@@ -293,8 +293,8 @@ void PCLLocalization::initializeRegistration()
     registration_ = ndt_omp;
   }
   else if (registration_method_ == "GICP_OMP") {
-    pclomp::GeneralizedIterativeClosestPoint<pcl::PointXYZI, pcl::PointXYZI>::Ptr gicp_omp(
-      new pclomp::GeneralizedIterativeClosestPoint<pcl::PointXYZI, pcl::PointXYZI>());
+    pclomp::GeneralizedIterativeClosestPoint<PclPointType, PclPointType>::Ptr gicp_omp(
+      new pclomp::GeneralizedIterativeClosestPoint<PclPointType, PclPointType>());
     gicp_omp->setTransformationEpsilon(transform_epsilon_);
     registration_ = gicp_omp;
   }
@@ -327,7 +327,7 @@ void PCLLocalization::initialPoseReceived(const geometry_msgs::msg::PoseWithCova
 void PCLLocalization::mapReceived(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
   RCLCPP_INFO(get_logger(), "mapReceived");
-  pcl::PointCloud<pcl::PointXYZI>::Ptr map_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>);
+  PclCloudType::Ptr map_cloud_ptr(new PclCloudType);
 
   if (msg->header.frame_id != global_frame_id_) {
     RCLCPP_WARN(this->get_logger(), "map_frame_id does not match　global_frame_id");
@@ -337,7 +337,7 @@ void PCLLocalization::mapReceived(const sensor_msgs::msg::PointCloud2::SharedPtr
   pcl::fromROSMsg(*msg, *map_cloud_ptr);
 
   if (registration_method_ == "GICP" || registration_method_ == "GICP_OMP") {
-    pcl::PointCloud<pcl::PointXYZI>::Ptr filtered_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>());
+    PclCloudType::Ptr filtered_cloud_ptr(new PclCloudType());
     voxel_grid_filter_.setInputCloud(map_cloud_ptr);
     voxel_grid_filter_.filter(*filtered_cloud_ptr);
     registration_->setInputTarget(filtered_cloud_ptr);
@@ -352,13 +352,24 @@ void PCLLocalization::mapReceived(const sensor_msgs::msg::PointCloud2::SharedPtr
 
 void PCLLocalization::odomReceived(const nav_msgs::msg::Odometry::ConstSharedPtr msg)
 {
-  if (!use_odom_) {return;}
+  //if (!use_odom_) {return;}
+  if (!use_odom_ || !initialpose_recieved_ || !corrent_pose_with_cov_stamped_ptr_) {
+    return;
+  }
+
   RCLCPP_INFO(get_logger(), "odomReceived");
 
   double current_odom_received_time = msg->header.stamp.sec +
     msg->header.stamp.nanosec * 1e-9;
   double dt_odom = current_odom_received_time - last_odom_received_time_;
   last_odom_received_time_ = current_odom_received_time;
+
+  // === DEBUG: Check time delta ===
+  if (std::isnan(dt_odom)) {
+    RCLCPP_ERROR(get_logger(), "[ODOM DEBUG] dt_odom is NaN!");
+    return;
+  }
+
   if (dt_odom > 1.0 /* [sec] */) {
     RCLCPP_WARN(this->get_logger(), "odom time interval is too large");
     return;
@@ -368,15 +379,45 @@ void PCLLocalization::odomReceived(const nav_msgs::msg::Odometry::ConstSharedPtr
     return;
   }
 
+  // === DEBUG: Check incoming message values ===
+  if (std::isnan(msg->twist.twist.linear.x) || std::isnan(msg->twist.twist.linear.y) || std::isnan(msg->twist.twist.linear.z)) {
+    RCLCPP_ERROR(get_logger(), "[ODOM DEBUG] Incoming odom message linear twist contains NaN.");
+    return;
+  }
+  if (std::isnan(msg->twist.twist.angular.x) || std::isnan(msg->twist.twist.angular.y) || std::isnan(msg->twist.twist.angular.z)) {
+    RCLCPP_ERROR(get_logger(), "[ODOM DEBUG] Incoming odom message angular twist contains NaN.");
+    return;
+  }
+  // === DEBUG: Check current pose before using it ===
+  if (std::isnan(corrent_pose_with_cov_stamped_ptr_->pose.pose.position.x) ||
+      std::isnan(corrent_pose_with_cov_stamped_ptr_->pose.pose.orientation.w)) {
+    RCLCPP_ERROR(get_logger(), "[ODOM DEBUG] Current pose contains NaN before update.");
+    return;
+  }
+
+
   tf2::Quaternion previous_quat_tf;
   double roll, pitch, yaw;
+  // Note: There might be a typo here. 'corrent_pose' perhaps should be 'current_pose'.
   tf2::fromMsg(corrent_pose_with_cov_stamped_ptr_->pose.pose.orientation, previous_quat_tf);
 
   tf2::Matrix3x3(previous_quat_tf).getRPY(roll, pitch, yaw);
 
+  // === DEBUG: Check RPY after conversion ===
+  if (std::isnan(roll) || std::isnan(pitch) || std::isnan(yaw)) {
+      RCLCPP_ERROR(get_logger(), "[ODOM DEBUG] RPY from current orientation is NaN. R: %f, P: %f, Y: %f", roll, pitch, yaw);
+      return;
+  }
+
   roll += msg->twist.twist.angular.x * dt_odom;
   pitch += msg->twist.twist.angular.y * dt_odom;
   yaw += msg->twist.twist.angular.z * dt_odom;
+
+  // === DEBUG: Check RPY after integration ===
+  if (std::isnan(roll) || std::isnan(pitch) || std::isnan(yaw)) {
+      RCLCPP_ERROR(get_logger(), "[ODOM DEBUG] Updated RPY contains NaN. R: %f, P: %f, Y: %f", roll, pitch, yaw);
+      return;
+  }
 
   Eigen::Quaterniond quat_eig =
     Eigen::AngleAxisd(roll, Eigen::Vector3d::UnitX()) *
@@ -391,10 +432,23 @@ void PCLLocalization::odomReceived(const nav_msgs::msg::Odometry::ConstSharedPtr
     msg->twist.twist.linear.z};
   Eigen::Vector3d delta_position = quat_eig.matrix() * dt_odom * odom;
 
+  // === DEBUG: Check calculated delta_position ===
+  if (std::isnan(delta_position.x()) || std::isnan(delta_position.y()) || std::isnan(delta_position.z())) {
+      RCLCPP_ERROR(get_logger(), "[ODOM DEBUG] delta_position contains NaN. dx: %f, dy: %f, dz: %f",
+                  delta_position.x(), delta_position.y(), delta_position.z());
+      return;
+  }
+
   corrent_pose_with_cov_stamped_ptr_->pose.pose.position.x += delta_position.x();
   corrent_pose_with_cov_stamped_ptr_->pose.pose.position.y += delta_position.y();
   corrent_pose_with_cov_stamped_ptr_->pose.pose.position.z += delta_position.z();
   corrent_pose_with_cov_stamped_ptr_->pose.pose.orientation = quat_msg;
+
+  // === DEBUG: Final check on the updated pose ===
+  const auto& final_pos = corrent_pose_with_cov_stamped_ptr_->pose.pose.position;
+  if (std::isnan(final_pos.x) || std::isnan(final_pos.y) || std::isnan(final_pos.z)) {
+      RCLCPP_ERROR(get_logger(), "[ODOM DEBUG] Final pose position became NaN after update.");
+  }
 }
 
 void PCLLocalization::imuReceived(const sensor_msgs::msg::Imu::ConstSharedPtr msg)
@@ -444,10 +498,19 @@ void PCLLocalization::imuReceived(const sensor_msgs::msg::Imu::ConstSharedPtr ms
 
 void PCLLocalization::cloudReceived(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg)
 {
-  if (!map_recieved_ || !initialpose_recieved_) {return;}
+  //if (!map_recieved_ || !initialpose_recieved_) {return;}
+  if (!msg || !map_recieved_ || !initialpose_recieved_ || !corrent_pose_with_cov_stamped_ptr_) {
+    RCLCPP_DEBUG(get_logger(), "Skipping cloud processing due to uninitialized state.");
+    return;
+  }
   RCLCPP_INFO(get_logger(), "cloudReceived");
-  pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>);
-  pcl::fromROSMsg(*msg, *cloud_ptr);
+  PclCloudType::Ptr temp_cloud_ptr(new PclCloudType);
+  pcl::fromROSMsg(*msg, *temp_cloud_ptr);
+
+  // Remove nan values from the cloud
+  auto cloud_ptr = pcl::make_shared<PclCloudType>();
+  std::vector<int> indices;
+  pcl::removeNaNFromPointCloud(*temp_cloud_ptr, *cloud_ptr, indices);
 
   // If your cloud is not robot-centric, convert to base_frame.
   if (msg->header.frame_id != base_frame_id_) {
@@ -468,7 +531,7 @@ void PCLLocalization::cloudReceived(const sensor_msgs::msg::PointCloud2::ConstSh
 
     Eigen::Matrix4f initial_transformation =
       tf2::transformToEigen(base_to_lidar_stamped.transform).matrix().cast<float>();
-    pcl::PointCloud<pcl::PointXYZI>::Ptr transformed_cloud(new pcl::PointCloud<pcl::PointXYZI>());
+    PclCloudType::Ptr transformed_cloud(new PclCloudType());
     pcl::transformPointCloud(*cloud_ptr, *transformed_cloud, initial_transformation);
     cloud_ptr = transformed_cloud;
   }
@@ -479,19 +542,19 @@ void PCLLocalization::cloudReceived(const sensor_msgs::msg::PointCloud2::ConstSh
     lidar_undistortion_.adjustDistortion(cloud_ptr, received_time);
   }
 
-  pcl::PointCloud<pcl::PointXYZI>::Ptr filtered_cloud_ptr(new pcl::PointCloud<pcl::PointXYZI>());
+  PclCloudType::Ptr filtered_cloud_ptr(new PclCloudType());
   voxel_grid_filter_.setInputCloud(cloud_ptr);
   voxel_grid_filter_.filter(*filtered_cloud_ptr);
 
   double r;
-  pcl::PointCloud<pcl::PointXYZI> tmp;
+  PclCloudType tmp;
   for (const auto & p : filtered_cloud_ptr->points) {
     r = sqrt(pow(p.x, 2.0) + pow(p.y, 2.0));
     if (scan_min_range_ < r && r < scan_max_range_) {
       tmp.push_back(p);
     }
   }
-  pcl::PointCloud<pcl::PointXYZI>::Ptr tmp_ptr(new pcl::PointCloud<pcl::PointXYZI>(tmp));
+  PclCloudType::Ptr tmp_ptr(new PclCloudType(tmp));
   registration_->setInputSource(tmp_ptr);
 
   Eigen::Affine3d affine;
@@ -499,7 +562,7 @@ void PCLLocalization::cloudReceived(const sensor_msgs::msg::PointCloud2::ConstSh
 
   Eigen::Matrix4f init_guess = affine.matrix().cast<float>();
 
-  pcl::PointCloud<pcl::PointXYZI>::Ptr output_cloud(new pcl::PointCloud<pcl::PointXYZI>);
+  PclCloudType::Ptr output_cloud(new PclCloudType);
   rclcpp::Clock system_clock;
   rclcpp::Time time_align_start = system_clock.now();
   registration_->align(*output_cloud, init_guess);

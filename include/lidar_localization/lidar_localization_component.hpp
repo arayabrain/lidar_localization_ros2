@@ -35,7 +35,10 @@
 #include <pclomp/gicp_omp.h>
 #include <pclomp/gicp_omp_impl.hpp>
 
+
 #include "lidar_localization/lidar_undistortion.hpp"
+#include "lidar_localization/point_type.hpp"
+
 
 using namespace std::chrono_literals;
 
@@ -85,8 +88,8 @@ public:
   rclcpp::Subscription<sensor_msgs::msg::Imu>::ConstSharedPtr
     imu_sub_;
 
-  boost::shared_ptr<pcl::Registration<pcl::PointXYZI, pcl::PointXYZI>> registration_;
-  pcl::VoxelGrid<pcl::PointXYZI> voxel_grid_filter_;
+  boost::shared_ptr<pcl::Registration<PclPointType, PclPointType>> registration_;
+  pcl::VoxelGrid<PclPointType> voxel_grid_filter_;
   geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr corrent_pose_with_cov_stamped_ptr_;
   nav_msgs::msg::Path::SharedPtr path_ptr_;
   sensor_msgs::msg::PointCloud2::ConstSharedPtr last_scan_ptr_;
