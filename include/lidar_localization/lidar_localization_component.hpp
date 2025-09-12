@@ -35,6 +35,8 @@
 #include <pclomp/gicp_omp.h>
 #include <pclomp/gicp_omp_impl.hpp>
 
+#include <cpu_bbs3d/bbs3d.hpp>
+
 
 #include "lidar_localization/lidar_undistortion.hpp"
 #include "lidar_localization/point_type.hpp"
@@ -64,6 +66,8 @@ public:
   void odomReceived(const nav_msgs::msg::Odometry::ConstSharedPtr msg);
   void imuReceived(const sensor_msgs::msg::Imu::ConstSharedPtr msg);
   void cloudReceived(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg);
+  void performGlobalLocalization(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg);
+
   // void gnssReceived();
 
   tf2_ros::TransformBroadcaster broadcaster_;
@@ -129,6 +133,22 @@ public:
 
   int ndt_num_threads_;
   int ndt_max_iterations_;
+  
+  bool perform_global_localization_ = false;
+  double bbs_min_level_res_;
+  int bbs_max_level_;
+  double bbs_score_threshold_percentage_;
+  int bbs_num_threads_;
+  int bbs_timeout_msec_;
+  float bbs_min_roll_;
+  float bbs_min_pitch_;
+  float bbs_min_yaw_;
+  float bbs_max_roll_;
+  float bbs_max_pitch_;
+  float bbs_max_yaw_;
+  bool use_gicp_refinement_ = true;
+
+  PclCloudType::Ptr bbs_map_ptr_;
 
   // imu
   LidarUndistortion lidar_undistortion_;

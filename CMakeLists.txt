@@ -24,6 +24,7 @@ find_package(tf2_eigen REQUIRED)
 find_package(pcl_conversions REQUIRED)
 find_package(PCL REQUIRED)
 find_package(ndt_omp_ros2 REQUIRED)
+find_package(cpu_bbs3d REQUIRED)
 find_package(OpenMP)
 
 if (OPENMP_FOUND)
@@ -62,6 +63,7 @@ target_link_libraries(lidar_localization_node
   ${PCL_LIBRARIES}
   ${rclcpp_lifecycle_LIBRARIES}
   ${std_msgs_LIBRARIES}
+  cpu_bbs3d::cpu_bbs3d
 )
 link_directories(
   ${PCL_LIBRARY_DIRS}
