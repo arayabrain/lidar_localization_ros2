@@ -24,7 +24,7 @@ find_package(tf2_eigen REQUIRED)
 find_package(pcl_conversions REQUIRED)
 find_package(PCL REQUIRED)
 find_package(ndt_omp_ros2 REQUIRED)
-find_package(cpu_bbs3d REQUIRED)
+#find_package(cpu_bbs3d REQUIRED)
 find_package(OpenMP)
 
 if (OPENMP_FOUND)
@@ -33,59 +33,59 @@ if (OPENMP_FOUND)
 endif()
 
 
-add_library(lidar_localization_component SHARED
-src/lidar_localization_component.cpp
-)
+# add_library(lidar_localization_component SHARED
+# src/lidar_localization_component.cpp
+# )
 
-ament_target_dependencies(lidar_localization_component
-  rclcpp
-  tf2_ros
-  tf2_geometry_msgs
-  tf2_sensor_msgs
-  tf2_eigen
-  geometry_msgs
-  sensor_msgs
-  nav_msgs
-  pcl_conversions
-  ndt_omp_ros2
-)
+# ament_target_dependencies(lidar_localization_component
+#   rclcpp
+#   tf2_ros
+#   tf2_geometry_msgs
+#   tf2_sensor_msgs
+#   tf2_eigen
+#   geometry_msgs
+#   sensor_msgs
+#   nav_msgs
+#   pcl_conversions
+#   ndt_omp_ros2
+# )
 
-include_directories(
-  include
-  ${PCL_INCLUDE_DIRS}
-  ${lifecycle_msgs_INCLUDE_DIRS}
-  ${rclcpp_lifecycle_INCLUDE_DIRS}
-  ${rclcpp_INCLUDE_DIRS})
+# include_directories(
+#   include
+#   ${PCL_INCLUDE_DIRS}
+#   ${lifecycle_msgs_INCLUDE_DIRS}
+#   ${rclcpp_lifecycle_INCLUDE_DIRS}
+#   ${rclcpp_INCLUDE_DIRS})
 
-add_executable(lidar_localization_node src/lidar_localization_node.cpp)
-target_link_libraries(lidar_localization_node
-  lidar_localization_component
-  ${PCL_LIBRARIES}
-  ${rclcpp_lifecycle_LIBRARIES}
-  ${std_msgs_LIBRARIES}
-  cpu_bbs3d::cpu_bbs3d
-)
-link_directories(
-  ${PCL_LIBRARY_DIRS}
-)
-add_definitions(${PCL_DEFINITIONS})
+# add_executable(lidar_localization_node src/lidar_localization_node.cpp)
+# target_link_libraries(lidar_localization_node
+#   lidar_localization_component
+#   ${PCL_LIBRARIES}
+#   ${rclcpp_lifecycle_LIBRARIES}
+#   ${std_msgs_LIBRARIES}
+#   cpu_bbs3d::cpu_bbs3d
+# )
+# link_directories(
+#   ${PCL_LIBRARY_DIRS}
+# )
+# add_definitions(${PCL_DEFINITIONS})
 
-ament_export_libraries(lidar_localization_component)
+# ament_export_libraries(lidar_localization_component)
 
-install(TARGETS
-  lidar_localization_node
-  DESTINATION lib/${PROJECT_NAME})
+# install(TARGETS
+#   lidar_localization_node
+#   DESTINATION lib/${PROJECT_NAME})
 
-install(TARGETS
-  lidar_localization_component
-  ARCHIVE DESTINATION lib
-  LIBRARY DESTINATION lib
-  RUNTIME DESTINATION bin)
+# install(TARGETS
+#   lidar_localization_component
+#   ARCHIVE DESTINATION lib
+#   LIBRARY DESTINATION lib
+#   RUNTIME DESTINATION bin)
 
-install(DIRECTORY
-  launch
-  param
-  DESTINATION share/${PROJECT_NAME}/
-)
+# install(DIRECTORY
+#   launch
+#   param
+#   DESTINATION share/${PROJECT_NAME}/
+# )
 
-ament_package()
+# ament_package()
