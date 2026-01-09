@@ -88,4 +88,4 @@ endif()
 #   DESTINATION share/${PROJECT_NAME}/
 # )
 
-# ament_package()
+ament_package()
